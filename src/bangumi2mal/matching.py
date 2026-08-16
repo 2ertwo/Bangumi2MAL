@@ -4,6 +4,7 @@ import logging
 import re
 import unicodedata
 from dataclasses import replace
+from datetime import date, timedelta
 from difflib import SequenceMatcher
 from typing import Optional, Protocol
 
@@ -44,6 +45,15 @@ def _date_similarity(entry_date: str, candidate_date: str) -> float:
         return 0.5
     if entry_date == candidate_date:
         return 1.0
+    if len(entry_date) == 10 and len(candidate_date) == 10:
+        try:
+            entry_day = date.fromisoformat(entry_date)
+            candidate_day = date.fromisoformat(candidate_date)
+        except ValueError:
+            pass
+        else:
+            if abs((entry_day - candidate_day).days) <= 1:
+                return 1.0
     if len(entry_date) >= 7 and len(candidate_date) >= 7 and entry_date[:7] == candidate_date[:7]:
         return 0.9
     if entry_date[:4] == candidate_date[:4]:
@@ -86,11 +96,11 @@ class AnimeMatcher:
         if primary.candidate is not None:
             return primary
 
-        period = self._air_season(entry.air_date)
-        if period is None:
+        periods = self._air_seasons(entry.air_date)
+        if not periods:
             return primary
 
-        seasonal = self._rank(entry, self._season_candidates(period))
+        seasonal = self._rank(entry, self._season_candidates(periods))
         fallback = self._match_ranked(seasonal, "automatic_season")
         return fallback if fallback.method != "no_candidates" else primary
 
@@ -106,13 +116,19 @@ class AnimeMatcher:
                 by_id[candidate.anime_id] = candidate
         return tuple(by_id.values())
 
-    def _season_candidates(self, period: tuple[int, str]) -> tuple[MalCandidate, ...]:
-        if period not in self._season_cache:
-            year, season = period
-            self._season_cache[period] = tuple(
-                self.client.list_anime_by_season(year, season)
-            )
-        return self._season_cache[period]
+    def _season_candidates(
+        self, periods: tuple[tuple[int, str], ...]
+    ) -> tuple[MalCandidate, ...]:
+        by_id: dict[int, MalCandidate] = {}
+        for period in periods:
+            if period not in self._season_cache:
+                year, season = period
+                self._season_cache[period] = tuple(
+                    self.client.list_anime_by_season(year, season)
+                )
+            for candidate in self._season_cache[period]:
+                by_id[candidate.anime_id] = candidate
+        return tuple(by_id.values())
 
     @staticmethod
     def _rank(
@@ -145,3 +161,23 @@ class AnimeMatcher:
             return None
         seasons = ("winter", "spring", "summer", "fall")
         return int(match.group(1)), seasons[(month - 1) // 3]
+
+    @classmethod
+    def _air_seasons(cls, air_date: str) -> tuple[tuple[int, str], ...]:
+        primary = cls._air_season(air_date)
+        if primary is None:
+            return ()
+        if len(air_date) != 10:
+            return (primary,)
+        try:
+            air_day = date.fromisoformat(air_date)
+        except ValueError:
+            return (primary,)
+
+        periods: list[tuple[int, str]] = []
+        for offset in (0, -1, 1):
+            nearby_day = air_day + timedelta(days=offset)
+            period = cls._air_season(nearby_day.isoformat())
+            if period is not None and period not in periods:
+                periods.append(period)
+        return tuple(periods)

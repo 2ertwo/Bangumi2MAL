@@ -33,6 +33,35 @@ def test_candidate_score_rewards_title_date_and_episode_match():
     assert candidate_score(entry(), candidate) == pytest.approx(1.0)
 
 
+@pytest.mark.parametrize(
+    "entry_date, candidate_date",
+    [
+        ("2023-09-29", "2023-09-28"),
+        ("2023-09-29", "2023-09-30"),
+        ("2023-03-31", "2023-04-01"),
+        ("2023-12-31", "2024-01-01"),
+    ],
+)
+def test_candidate_score_accepts_one_day_air_date_difference(entry_date, candidate_date):
+    candidate = MalCandidate(
+        anime_id=52991,
+        title="Sousou no Frieren",
+        start_date=candidate_date,
+        num_episodes=28,
+    )
+    assert candidate_score(entry(air_date=entry_date), candidate) == pytest.approx(1.0)
+
+
+def test_candidate_score_does_not_fully_accept_two_day_air_date_difference():
+    candidate = MalCandidate(
+        anime_id=52991,
+        title="Sousou no Frieren",
+        start_date="2023-09-27",
+        num_episodes=28,
+    )
+    assert candidate_score(entry(), candidate) < 1.0
+
+
 def test_candidate_score_prefers_exact_air_date_for_same_title():
     same_title_other_date = MalCandidate(
         anime_id=1,
@@ -124,7 +153,7 @@ def test_matcher_rejects_ambiguous_candidates_after_quarter_fallback():
     result = AnimeMatcher(Client()).match(ambiguous)
     assert result.candidate is None
     assert result.method == "ambiguous"
-    assert periods == [(2020, "winter")]
+    assert periods == [(2020, "winter"), (2019, "fall")]
 
 
 def test_matcher_skips_failed_alias_search_and_uses_other_titles():
@@ -186,6 +215,32 @@ def test_matcher_caches_each_quarter_until_cleared():
     matcher.clear_cache()
     matcher.match(entry(subject_id=3))
     assert periods == [(2023, "summer"), (2023, "summer")]
+
+
+def test_matcher_scans_adjacent_quarter_for_one_day_boundary_tolerance():
+    periods = []
+
+    class Client:
+        def search_anime(self, query, limit=10):
+            return []
+
+        def list_anime_by_season(self, year, season):
+            periods.append((year, season))
+            if (year, season) == (2023, "spring"):
+                return [
+                    MalCandidate(
+                        52991,
+                        "Sousou no Frieren",
+                        start_date="2023-04-01",
+                        num_episodes=28,
+                    )
+                ]
+            return []
+
+    result = AnimeMatcher(Client()).match(entry(air_date="2023-03-31"))
+    assert result.candidate is not None
+    assert result.method == "automatic_season"
+    assert periods == [(2023, "winter"), (2023, "spring")]
 
 
 @pytest.mark.parametrize(
