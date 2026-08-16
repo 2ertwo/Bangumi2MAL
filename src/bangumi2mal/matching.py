@@ -13,6 +13,12 @@ from .models import BangumiEntry, MalCandidate, MatchResult
 
 LOGGER = logging.getLogger(__name__)
 
+_TITLE_CONFUSABLES = str.maketrans({"\u0396": "Z", "\u03b6": "z"})
+
+
+def _normalize_search_title(value: str) -> str:
+    return unicodedata.normalize("NFKC", value).translate(_TITLE_CONFUSABLES)
+
 
 class SearchClient(Protocol):
     def list_anime_by_season(self, year: int, season: str) -> list[MalCandidate]: ...
@@ -21,7 +27,7 @@ class SearchClient(Protocol):
 
 
 def normalize_title(value: str) -> str:
-    value = unicodedata.normalize("NFKC", value).casefold()
+    value = _normalize_search_title(value).casefold()
     value = re.sub(r"[^\w\u3040-\u30ff\u3400-\u9fff]+", "", value, flags=re.UNICODE)
     return value
 
@@ -108,7 +114,7 @@ class AnimeMatcher:
         by_id: dict[int, MalCandidate] = {}
         for title in entry.search_titles[:6]:
             try:
-                candidates = self.client.search_anime(title, limit=10)
+                candidates = self.client.search_anime(_normalize_search_title(title), limit=10)
             except Exception as exc:
                 LOGGER.warning("Skipping failed MAL search title %r: %s", title, exc)
                 continue

@@ -257,3 +257,49 @@ def test_matcher_scans_adjacent_quarter_for_one_day_boundary_tolerance():
 )
 def test_air_date_maps_to_quarter(air_date, expected):
     assert AnimeMatcher._air_season(air_date) == expected
+
+
+def test_normalize_title_treats_greek_zeta_as_latin_z():
+    greek = "\u6a5f\u52d5\u6226\u58eb\u30ac\u30f3\u30c0\u30e0\u0396\u0396"
+    latin = "\u6a5f\u52d5\u6226\u58eb\u30ac\u30f3\u30c0\u30e0ZZ"
+    assert normalize_title(greek) == normalize_title(latin)
+
+
+def test_matcher_normalizes_greek_zeta_before_mal_search():
+    queries = []
+    latin_title = "\u6a5f\u52d5\u6226\u58eb\u30ac\u30f3\u30c0\u30e0ZZ"
+
+    class Client:
+        def search_anime(self, query, limit=10):
+            queries.append(query)
+            if query == latin_title:
+                return [
+                    MalCandidate(
+                        86,
+                        "Kidou Senshi Gundam ZZ",
+                        alternative_titles=(latin_title, "Mobile Suit Gundam ZZ"),
+                        start_date="1986-03-01",
+                        num_episodes=47,
+                    )
+                ]
+            return []
+
+        def list_anime_by_season(self, year, season):
+            raise AssertionError("quarter fallback should not run for normalized title match")
+
+    result = AnimeMatcher(Client()).match(
+        entry(
+            subject_id=4213,
+            title="\u6a5f\u52d5\u6226\u58eb\u30ac\u30f3\u30c0\u30e0\u0396\u0396",
+            title_cn="\u673a\u52a8\u6218\u58eb\u9ad8\u8fbeZZ",
+            total_episodes=47,
+            watched_episodes=47,
+            air_date="1986-03-01",
+        )
+    )
+
+    assert queries[0] == latin_title
+    assert result.candidate is not None
+    assert result.candidate.anime_id == 86
+    assert result.confidence == pytest.approx(1.0)
+    assert result.method == "automatic_search"
