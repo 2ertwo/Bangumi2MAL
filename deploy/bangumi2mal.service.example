@@ -1,0 +1,22 @@
+[Unit]
+Description=Bangumi2MAL web application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bangumi2mal
+Group=bangumi2mal
+WorkingDirectory=/opt/bangumi2mal
+EnvironmentFile=/opt/bangumi2mal/.env
+ExecStart=/opt/bangumi2mal/.venv/bin/gunicorn --workers 1 --bind 127.0.0.1:8000 "bangumi2mal.web:create_app()"
+Restart=on-failure
+RestartSec=5
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/bangumi2mal/data /opt/bangumi2mal/reports
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

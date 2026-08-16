@@ -1,0 +1,1 @@
+recursive-include src/bangumi2mal/web/templates *.html

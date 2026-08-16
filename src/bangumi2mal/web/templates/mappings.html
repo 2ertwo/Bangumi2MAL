@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3 mb-4">Saved mappings</h1>
+<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Bangumi</th><th>MyAnimeList</th><th>Source</th><th>Updated</th><th></th></tr></thead><tbody>
+{% for mapping in mappings %}<tr><td><a href="https://bgm.tv/subject/{{ mapping.bangumi_id }}" target="_blank" rel="noopener">{{ mapping.bangumi_title or mapping.bangumi_id }}</a></td><td><a href="https://myanimelist.net/anime/{{ mapping.mal_id }}" target="_blank" rel="noopener">{{ mapping.mal_title or mapping.mal_id }}</a></td><td>{{ mapping.source }}</td><td>{{ mapping.updated_at }}</td><td><form method="post" action="{{ url_for('delete_mapping', bangumi_id=mapping.bangumi_id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn btn-sm btn-outline-danger">Remove</button></form></td></tr>
+{% else %}<tr><td colspan="5" class="text-center text-secondary">No mappings saved.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

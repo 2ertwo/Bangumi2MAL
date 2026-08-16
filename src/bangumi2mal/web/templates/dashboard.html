@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div><h1 class="h3 mb-1">Sync dashboard</h1><div class="text-secondary">Bangumi → MyAnimeList</div></div>
+  <div>
+  {% if token %}<span class="badge text-bg-success">MAL authorized</span>
+  {% else %}<a class="btn btn-outline-primary" href="{{ url_for('mal_oauth_start') }}">Authorize MAL</a>{% endif %}
+  </div>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-md-6"><div class="card h-100"><div class="card-body">
+    <h2 class="h5">Run now</h2>
+    <p class="text-secondary">Always review a dry run before enabling live writes.</p>
+    <form method="post" action="{{ url_for('start_manual_sync') }}" class="d-flex gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn btn-primary" name="mode" value="dry-run">Start dry run</button>
+      <button class="btn btn-outline-danger" name="mode" value="live">Start live sync</button>
+    </form>
+  </div></div></div>
+  <div class="col-md-6"><div class="card h-100"><div class="card-body">
+    <h2 class="h5">Automatic sync</h2>
+    {% if settings.auto_sync_enabled %}<p class="mb-1">Enabled every {{ settings.auto_sync_hours }} hours.</p><small class="text-secondary">Next run: {{ job.next_run_time if job else 'pending' }}</small>
+    {% else %}<p class="mb-0 text-secondary">Disabled. Set <code>AUTO_SYNC_ENABLED=true</code> after validating a dry run.</p>{% endif %}
+  </div></div></div>
+</div>
+<div class="card"><div class="card-body"><h2 class="h5">Recent runs</h2></div>
+<div class="table-responsive"><table class="table table-hover mb-0"><thead><tr><th>Started</th><th>Source</th><th>Status</th><th>Total</th><th>Synced / planned</th><th>Unresolved</th><th></th></tr></thead><tbody>
+{% for run in runs %}<tr><td>{{ run.started_at }}</td><td>{{ run.source }}</td><td>{{ run.status }}</td><td>{{ run.total }}</td><td>{{ run.synced }} / {{ run.planned }}</td><td>{{ run.unresolved }}</td><td><a href="{{ url_for('run_detail', run_id=run.id) }}">View</a></td></tr>
+{% else %}<tr><td colspan="7" class="text-center text-secondary py-4">No syncs yet.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

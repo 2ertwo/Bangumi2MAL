@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3">Run {{ run.id }}</h1>
+<p class="text-secondary">{{ run.status }} · {{ run.started_at }} · {{ 'dry run' if run.dry_run else 'live' }}</p>
+{% if run.message %}<div class="alert alert-danger">{{ run.message }}</div>{% endif %}
+<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Bangumi</th><th>MAL</th><th>Match</th><th>Result</th><th>Changes / action</th></tr></thead><tbody>
+{% for item in items %}<tr>
+  <td><a href="https://bgm.tv/subject/{{ item.bangumi_id }}" target="_blank" rel="noopener">{{ item.bangumi_title }}</a><br><small>#{{ item.bangumi_id }}</small></td>
+  <td>{% if item.mal_id %}<a href="https://myanimelist.net/anime/{{ item.mal_id }}" target="_blank" rel="noopener">{{ item.mal_title or item.mal_id }}</a>{% else %}—{% endif %}</td>
+  <td>{{ item.match_method }}{% if item.match_confidence %}<br><small>{{ '%.3f'|format(item.match_confidence) }}</small>{% endif %}</td>
+  <td><span class="badge text-bg-{{ 'success' if item.result in ['synced','skipped'] else 'primary' if item.result == 'planned' else 'warning' if item.result == 'unresolved' else 'danger' }}">{{ item.result }}</span>{% if item.error %}<div class="small text-danger mt-1">{{ item.error }}</div>{% endif %}</td>
+  <td>
+    {% if item.changes %}<code>{{ item.changes }}</code>{% endif %}
+    {% if item.result == 'unresolved' %}
+      {% if item.candidates %}<div class="small mb-2">Candidates: {% for candidate in item.candidates %}<a class="me-2" href="https://myanimelist.net/anime/{{ candidate.anime_id }}" target="_blank" rel="noopener">{{ candidate.title }} ({{ '%.2f'|format(candidate.score) }})</a>{% endfor %}</div>{% endif %}
+      <form method="post" action="{{ url_for('map_item', item_id=item.id) }}" class="d-flex gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input class="form-control form-control-sm" name="mal_id" type="number" min="1" placeholder="MAL ID" required>
+        <button class="btn btn-sm btn-outline-primary" name="retry" value="yes">Save &amp; retry dry run</button>
+      </form>
+    {% endif %}
+  </td>
+</tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

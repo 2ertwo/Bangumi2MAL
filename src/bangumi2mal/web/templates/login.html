@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Login · Bangumi2MAL{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-5"><div class="col-sm-8 col-md-5 col-lg-4">
+  <div class="card shadow-sm"><div class="card-body p-4">
+    <h1 class="h4 mb-3">Bangumi2MAL</h1>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="form-label" for="password">Access password</label>
+      <input class="form-control mb-3" id="password" name="password" type="password" required autofocus>
+      <button class="btn btn-primary w-100">Log in</button>
+    </form>
+  </div></div>
+</div></div>
+{% endblock %}
