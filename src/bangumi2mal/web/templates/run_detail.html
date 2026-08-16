@@ -12,7 +12,7 @@
   </form>
 </div>
 <div class="table-responsive"><table class="table table-sm align-middle run-items-table"><thead><tr><th>Bangumi</th><th>MAL</th><th>Match</th><th>Result</th><th>Changes / action</th></tr></thead><tbody>
-{% for item in items %}<tr>
+{% for item in items %}<tr id="item-{{ item.id }}">
   <td>
     <div class="d-flex align-items-start gap-2">
       {% if item.bangumi_cover_url %}<a href="https://bgm.tv/subject/{{ item.bangumi_id }}" target="_blank" rel="noopener"><img src="{{ item.bangumi_cover_url }}" alt="{{ item.bangumi_title }} cover" width="72" height="102" class="object-fit-cover rounded" loading="lazy" referrerpolicy="no-referrer"></a>{% endif %}

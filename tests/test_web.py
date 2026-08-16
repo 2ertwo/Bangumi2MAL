@@ -174,8 +174,50 @@ def test_mapping_save_waits_for_explicit_retry(tmp_path, monkeypatch):
     )
 
     assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/runs/manual-map#item-{item_id}")
     mapping = database.get_mapping(42)
     assert mapping is not None
     assert mapping["mal_id"] == 84
     assert mapping["source"] == "manual"
     assert started == []
+
+
+def test_run_detail_lists_items_needing_attention_first(tmp_path):
+    app_settings = settings(tmp_path)
+    database = Database(app_settings.database_path)
+    database.initialize()
+    run = SyncRunResult("attention-first", True, "start", "finish", "completed")
+    run.items.extend(
+        [
+            SyncItemResult(1, "Planned title", 101, "MAL", "automatic", 1.0, "planned"),
+            SyncItemResult(2, "Skipped title", 102, "MAL", "automatic", 1.0, "skipped"),
+            SyncItemResult(3, "Failed title", None, "", "error", 0.0, "failed"),
+            SyncItemResult(
+                4,
+                "Needs confirmation",
+                None,
+                "",
+                "ambiguous",
+                0.8,
+                "unresolved",
+            ),
+        ]
+    )
+    database.create_run(run.run_id, "test", run.dry_run, run.started_at)
+    database.finish_run(run)
+
+    app = create_app(app_settings)
+    app.config["TESTING"] = True
+    client = app.test_client()
+    client.get("/login")
+    with client.session_transaction() as state:
+        csrf = state["csrf_token"]
+    client.post("/login", data={"password": "secret", "csrf_token": csrf})
+
+    response = client.get("/runs/attention-first")
+    page = response.data.decode()
+
+    assert response.status_code == 200
+    assert page.index("Needs confirmation") < page.index("Failed title")
+    assert page.index("Failed title") < page.index("Planned title")
+    assert page.index("Planned title") < page.index("Skipped title")

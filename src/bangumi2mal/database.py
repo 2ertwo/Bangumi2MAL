@@ -245,7 +245,14 @@ class Database:
     def get_run_items(self, run_id: str) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM sync_items WHERE run_id = ? ORDER BY id", (run_id,)
+                """SELECT * FROM sync_items
+                WHERE run_id = ?
+                ORDER BY CASE result
+                    WHEN 'unresolved' THEN 0
+                    WHEN 'failed' THEN 1
+                    ELSE 2
+                END, id""",
+                (run_id,),
             ).fetchall()
         items: list[dict[str, Any]] = []
         for row in rows:

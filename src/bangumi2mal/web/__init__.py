@@ -167,13 +167,16 @@ def create_app(settings: Optional[Settings] = None) -> Flask:
         item = database.get_item(item_id)
         if item is None:
             abort(404)
+        detail_url = url_for(
+            "run_detail", run_id=item["run_id"], _anchor=f"item-{item_id}"
+        )
         try:
             mal_id = int(request.form.get("mal_id", ""))
             if mal_id <= 0:
                 raise ValueError
         except ValueError:
             flash("MAL ID must be a positive integer.", "danger")
-            return redirect(url_for("run_detail", run_id=item["run_id"]))
+            return redirect(detail_url)
         try:
             anime = build_mal_client(settings, database).get_anime(mal_id)
             database.save_mapping(
@@ -185,9 +188,9 @@ def create_app(settings: Optional[Settings] = None) -> Flask:
             )
         except Exception as exc:
             flash(f"Could not validate that MAL ID: {exc}", "danger")
-            return redirect(url_for("run_detail", run_id=item["run_id"]))
+            return redirect(detail_url)
         flash("Mapping saved. Confirm the remaining items, then retry the dry run.", "success")
-        return redirect(url_for("run_detail", run_id=item["run_id"]))
+        return redirect(detail_url)
 
     @app.get("/mappings")
     @login_required
