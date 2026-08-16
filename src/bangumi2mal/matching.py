@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from dataclasses import replace
@@ -7,6 +8,9 @@ from difflib import SequenceMatcher
 from typing import Protocol
 
 from .models import BangumiEntry, MalCandidate, MatchResult
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class SearchClient(Protocol):
@@ -73,7 +77,12 @@ class AnimeMatcher:
     def match(self, entry: BangumiEntry) -> MatchResult:
         by_id: dict[int, MalCandidate] = {}
         for title in entry.search_titles[:6]:
-            for candidate in self.client.search_anime(title, limit=10):
+            try:
+                candidates = self.client.search_anime(title, limit=10)
+            except Exception as exc:
+                LOGGER.warning("Skipping failed MAL search title %r: %s", title, exc)
+                continue
+            for candidate in candidates:
                 by_id[candidate.anime_id] = candidate
 
         ranked = sorted(

@@ -102,3 +102,29 @@ def test_matcher_rejects_ambiguous_candidates():
     result = AnimeMatcher(Client()).match(ambiguous)
     assert result.candidate is None
     assert result.method == "ambiguous"
+
+
+def test_matcher_skips_failed_alias_search_and_uses_other_titles():
+    queries = []
+
+    class Client:
+        def search_anime(self, query, limit=10):
+            queries.append(query)
+            if query == "invalid alias":
+                raise RuntimeError("invalid q")
+            if query == "Frieren: Beyond Journey's End":
+                return [
+                    MalCandidate(
+                        52991,
+                        "Frieren: Beyond Journey's End",
+                        start_date="2023-09-29",
+                        num_episodes=28,
+                    )
+                ]
+            return []
+
+    result = AnimeMatcher(Client()).match(
+        entry(title="invalid alias", title_cn="", aliases=("Frieren: Beyond Journey's End",))
+    )
+    assert result.candidate is not None
+    assert result.candidate.anime_id == 52991
