@@ -66,7 +66,7 @@ class MalOAuth:
 
 
 class MalClient(BaseApiClient):
-    SEARCH_FIELDS = "id,title,alternative_titles,media_type,start_date,num_episodes,my_list_status"
+    SEARCH_FIELDS = "id,title,alternative_titles,main_picture,media_type,start_date,num_episodes,my_list_status"
 
     def __init__(
         self,
@@ -129,6 +129,7 @@ class MalClient(BaseApiClient):
     @staticmethod
     def _candidate_from_node(node: dict[str, Any]) -> MalCandidate:
         alternatives = node.get("alternative_titles") or {}
+        picture = node.get("main_picture") or {}
         titles: list[str] = []
         for key in ("ja", "en"):
             if alternatives.get(key):
@@ -141,4 +142,5 @@ class MalClient(BaseApiClient):
             media_type=str(node.get("media_type") or ""),
             start_date=str(node.get("start_date") or ""),
             num_episodes=int(node.get("num_episodes") or 0),
+            cover_url=str(picture.get("medium") or picture.get("large") or ""),
         )

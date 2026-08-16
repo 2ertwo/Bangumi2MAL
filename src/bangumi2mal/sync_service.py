@@ -91,6 +91,7 @@ class SyncService:
                         match_method=matched.method,
                         match_confidence=matched.confidence,
                         result="unresolved",
+                        bangumi_cover_url=entry.cover_url,
                         candidates=candidates,
                         error="No unambiguous MAL match was found",
                     )
@@ -116,6 +117,10 @@ class SyncService:
                 match_method=match_method,
                 match_confidence=confidence,
                 result="skipped",
+                bangumi_cover_url=entry.cover_url,
+                mal_cover_url=str(
+                    (anime.get("main_picture") or {}).get("medium") or (anime.get("main_picture") or {}).get("large") or ""
+                ),
                 changes=changes,
                 candidates=candidates,
             )
@@ -139,6 +144,7 @@ class SyncService:
                 match_method="error",
                 match_confidence=0.0,
                 result="failed",
+                bangumi_cover_url=entry.cover_url,
                 error=str(exc),
             )
 

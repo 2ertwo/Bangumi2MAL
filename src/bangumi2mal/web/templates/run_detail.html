@@ -5,16 +5,42 @@
 {% if run.message %}<div class="alert alert-danger">{{ run.message }}</div>{% endif %}
 <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Bangumi</th><th>MAL</th><th>Match</th><th>Result</th><th>Changes / action</th></tr></thead><tbody>
 {% for item in items %}<tr>
-  <td><a href="https://bgm.tv/subject/{{ item.bangumi_id }}" target="_blank" rel="noopener">{{ item.bangumi_title }}</a><br><small>#{{ item.bangumi_id }}</small></td>
-  <td>{% if item.mal_id %}<a href="https://myanimelist.net/anime/{{ item.mal_id }}" target="_blank" rel="noopener">{{ item.mal_title or item.mal_id }}</a>{% else %}—{% endif %}</td>
+  <td>
+    <div class="d-flex align-items-start gap-2">
+      {% if item.bangumi_cover_url %}<a href="https://bgm.tv/subject/{{ item.bangumi_id }}" target="_blank" rel="noopener"><img src="{{ item.bangumi_cover_url }}" alt="{{ item.bangumi_title }} cover" width="72" height="102" class="object-fit-cover rounded" loading="lazy" referrerpolicy="no-referrer"></a>{% endif %}
+      <div><a href="https://bgm.tv/subject/{{ item.bangumi_id }}" target="_blank" rel="noopener">{{ item.bangumi_title }}</a><br><small>#{{ item.bangumi_id }}</small></div>
+    </div>
+  </td>
+  <td>
+    {% if item.mal_id %}<div class="d-flex align-items-start gap-2">
+      {% if item.mal_cover_url %}<a href="https://myanimelist.net/anime/{{ item.mal_id }}" target="_blank" rel="noopener"><img src="{{ item.mal_cover_url }}" alt="{{ item.mal_title }} cover" width="72" height="102" class="object-fit-cover rounded" loading="lazy" referrerpolicy="no-referrer"></a>{% endif %}
+      <div><a href="https://myanimelist.net/anime/{{ item.mal_id }}" target="_blank" rel="noopener">{{ item.mal_title or item.mal_id }}</a><br><small>#{{ item.mal_id }}</small></div>
+    </div>{% else %}—{% endif %}
+  </td>
   <td>{{ item.match_method }}{% if item.match_confidence %}<br><small>{{ '%.3f'|format(item.match_confidence) }}</small>{% endif %}</td>
   <td><span class="badge text-bg-{{ 'success' if item.result in ['synced','skipped'] else 'primary' if item.result == 'planned' else 'warning' if item.result == 'unresolved' else 'danger' }}">{{ item.result }}</span>{% if item.error %}<div class="small text-danger mt-1">{{ item.error }}</div>{% endif %}</td>
   <td>
     {% if item.changes %}<code>{{ item.changes }}</code>{% endif %}
     {% if item.result == 'unresolved' %}
-      {% if item.candidates %}<div class="small mb-2">Candidates: {% for candidate in item.candidates %}<a class="me-2" href="https://myanimelist.net/anime/{{ candidate.anime_id }}" target="_blank" rel="noopener">{{ candidate.title }} ({{ '%.2f'|format(candidate.score) }})</a>{% endfor %}</div>{% endif %}
+      {% if item.candidates %}
+      <div class="small fw-semibold mt-2 mb-1">Candidates</div>
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        {% for candidate in item.candidates %}
+        <form method="post" action="{{ url_for('map_item', item_id=item.id) }}" class="card flex-shrink-0">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="retry" value="yes">
+          {% if candidate.cover_url %}<a href="https://myanimelist.net/anime/{{ candidate.anime_id }}" target="_blank" rel="noopener"><img src="{{ candidate.cover_url }}" alt="{{ candidate.title }} cover" width="142" height="200" class="card-img-top object-fit-cover" loading="lazy" referrerpolicy="no-referrer"></a>{% endif %}
+          <div class="card-body p-2 d-flex flex-column">
+            <a class="small mb-1" href="https://myanimelist.net/anime/{{ candidate.anime_id }}" target="_blank" rel="noopener">{{ candidate.title }}</a>
+            <div class="small text-secondary mb-2">Score {{ '%.2f'|format(candidate.score) }} · #{{ candidate.anime_id }}</div>
+            <button class="btn btn-sm btn-outline-primary mt-auto" name="mal_id" value="{{ candidate.anime_id }}">Use &amp; retry</button>
+          </div>
+        </form>
+        {% endfor %}
+      </div>
+      {% endif %}
       <form method="post" action="{{ url_for('map_item', item_id=item.id) }}" class="d-flex gap-2">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input class="form-control form-control-sm" name="mal_id" type="number" min="1" placeholder="MAL ID" required>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input class="form-control form-control-sm" name="mal_id" type="number" min="1" placeholder="Other MAL ID" required>
         <button class="btn btn-sm btn-outline-primary" name="retry" value="yes">Save &amp; retry dry run</button>
       </form>
     {% endif %}

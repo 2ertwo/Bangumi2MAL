@@ -22,6 +22,7 @@ class Mal:
             "id": anime_id,
             "title": "Title",
             "num_episodes": 12,
+            "main_picture": {"medium": "https://example.com/mal.jpg"},
             "my_list_status": {"status": "watching", "score": 7, "num_episodes_watched": 7},
         }
 
@@ -39,6 +40,7 @@ def test_dry_run_does_not_write_and_does_not_decrease_episodes(tmp_path):
     assert mal.updates == []
     assert result.items[0].result == "planned"
     assert result.items[0].changes == {"score": 8}
+    assert result.items[0].mal_cover_url == "https://example.com/mal.jpg"
 
 
 def test_live_sync_writes_changes(tmp_path):

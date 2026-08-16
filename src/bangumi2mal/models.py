@@ -20,6 +20,7 @@ class BangumiEntry:
     total_episodes: int
     air_date: str = ""
     updated_at: str = ""
+    cover_url: str = ""
 
     @property
     def search_titles(self) -> list[str]:
@@ -36,6 +37,7 @@ class MalCandidate:
     start_date: str = ""
     num_episodes: int = 0
     score: float = 0.0
+    cover_url: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -46,6 +48,7 @@ class MalCandidate:
             "start_date": self.start_date,
             "num_episodes": self.num_episodes,
             "score": round(self.score, 4),
+            "cover_url": self.cover_url,
         }
 
 
@@ -66,6 +69,8 @@ class SyncItemResult:
     match_method: str
     match_confidence: float
     result: str
+    bangumi_cover_url: str = ""
+    mal_cover_url: str = ""
     changes: dict[str, Any] = field(default_factory=dict)
     candidates: list[dict[str, Any]] = field(default_factory=list)
     error: str = ""

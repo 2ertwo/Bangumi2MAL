@@ -3,6 +3,8 @@ from pathlib import Path
 from werkzeug.security import generate_password_hash
 
 from bangumi2mal.config import Settings
+from bangumi2mal.database import Database
+from bangumi2mal.models import SyncItemResult, SyncRunResult
 from bangumi2mal.web import create_app
 
 
@@ -48,3 +50,46 @@ def test_password_only_login(tmp_path):
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/")
     assert client.get("/").status_code == 200
+
+
+def test_run_detail_renders_entry_and_candidate_covers(tmp_path):
+    app_settings = settings(tmp_path)
+    database = Database(app_settings.database_path)
+    database.initialize()
+    run = SyncRunResult("covers", True, "start", "finish", "completed")
+    run.items.append(
+        SyncItemResult(
+            42,
+            "Bangumi title",
+            None,
+            "",
+            "ambiguous",
+            0.8,
+            "unresolved",
+            bangumi_cover_url="https://example.com/bangumi.jpg",
+            candidates=[
+                {
+                    "anime_id": 84,
+                    "title": "MAL candidate",
+                    "score": 0.8,
+                    "cover_url": "https://example.com/candidate.jpg",
+                }
+            ],
+        )
+    )
+    database.create_run(run.run_id, "test", run.dry_run, run.started_at)
+    database.finish_run(run)
+
+    app = create_app(app_settings)
+    app.config["TESTING"] = True
+    client = app.test_client()
+    client.get("/login")
+    with client.session_transaction() as state:
+        csrf = state["csrf_token"]
+    client.post("/login", data={"password": "secret", "csrf_token": csrf})
+
+    response = client.get("/runs/covers")
+    assert response.status_code == 200
+    assert b"https://example.com/bangumi.jpg" in response.data
+    assert b"https://example.com/candidate.jpg" in response.data
+    assert b'name="mal_id" value="84"' in response.data

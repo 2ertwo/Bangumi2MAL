@@ -43,6 +43,7 @@ class BangumiClient(BaseApiClient):
     @staticmethod
     def _parse_entry(item: dict[str, Any]) -> BangumiEntry:
         subject = item.get("subject") or {}
+        images = subject.get("images") or {}
         return BangumiEntry(
             subject_id=int(item.get("subject_id") or subject.get("id")),
             title=str(subject.get("name") or ""),
@@ -53,4 +54,7 @@ class BangumiClient(BaseApiClient):
             total_episodes=int(subject.get("eps") or 0),
             air_date=str(subject.get("date") or ""),
             updated_at=str(item.get("updated_at") or ""),
+            cover_url=str(
+                images.get("large") or images.get("common") or images.get("medium") or ""
+            ),
         )

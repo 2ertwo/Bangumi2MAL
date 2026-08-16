@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS sync_items (
     bangumi_title TEXT NOT NULL,
     mal_id INTEGER,
     mal_title TEXT NOT NULL DEFAULT '',
+    bangumi_cover_url TEXT NOT NULL DEFAULT '',
+    mal_cover_url TEXT NOT NULL DEFAULT '',
     match_method TEXT NOT NULL DEFAULT '',
     match_confidence REAL NOT NULL DEFAULT 0,
     result TEXT NOT NULL,
@@ -87,6 +89,15 @@ class Database:
     def initialize(self) -> None:
         with self.connect() as connection:
             connection.executescript(SCHEMA)
+            columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(sync_items)").fetchall()
+            }
+            for column in ("bangumi_cover_url", "mal_cover_url"):
+                if column not in columns:
+                    connection.execute(
+                        f"ALTER TABLE sync_items ADD COLUMN {column} TEXT NOT NULL DEFAULT ''"
+                    )
 
     def get_mapping(self, bangumi_id: int) -> Optional[sqlite3.Row]:
         with self.connect() as connection:
@@ -171,9 +182,9 @@ class Database:
                 """
                 INSERT INTO sync_items
                     (run_id, bangumi_id, bangumi_title, mal_id, mal_title,
-                     match_method, match_confidence, result, changes_json,
+                     bangumi_cover_url, mal_cover_url, match_method, match_confidence, result, changes_json,
                      candidates_json, error)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
@@ -182,6 +193,8 @@ class Database:
                         item.bangumi_title,
                         item.mal_id,
                         item.mal_title,
+                        item.bangumi_cover_url,
+                        item.mal_cover_url,
                         item.match_method,
                         item.match_confidence,
                         item.result,
