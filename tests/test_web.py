@@ -77,6 +77,25 @@ def test_run_detail_renders_entry_and_candidate_covers(tmp_path):
             ],
         )
     )
+    run.items.append(
+        SyncItemResult(
+            43,
+            "Second Bangumi title",
+            None,
+            "",
+            "ambiguous",
+            0.7,
+            "unresolved",
+            candidates=[
+                {
+                    "anime_id": 86,
+                    "title": "Second MAL candidate",
+                    "score": 0.7,
+                    "cover_url": "https://example.com/candidate-2.jpg",
+                }
+            ],
+        )
+    )
     database.create_run(run.run_id, "test", run.dry_run, run.started_at)
     database.finish_run(run)
 
@@ -93,4 +112,70 @@ def test_run_detail_renders_entry_and_candidate_covers(tmp_path):
     assert b"https://example.com/bangumi.jpg" in response.data
     assert b"https://example.com/candidate.jpg" in response.data
     assert b'name="mal_id" value="84"' in response.data
-    assert b"candidate-strip" in response.data
+    assert b'name="mal_id" value="86"' in response.data
+    assert response.data.count(b"candidate-strip") == 2
+    assert b'data-bangumi-id="42"' in response.data
+    assert b'data-bangumi-id="43"' in response.data
+    assert b'Use &amp; retry' not in response.data
+    assert b'name="retry"' not in response.data
+    assert b"Retry dry run" in response.data
+
+
+def test_mapping_save_waits_for_explicit_retry(tmp_path, monkeypatch):
+    app_settings = settings(tmp_path)
+    database = Database(app_settings.database_path)
+    database.initialize()
+    run = SyncRunResult("manual-map", True, "start", "finish", "completed")
+    run.items.append(
+        SyncItemResult(
+            42,
+            "Bangumi title",
+            None,
+            "",
+            "ambiguous",
+            0.8,
+            "unresolved",
+        )
+    )
+    database.create_run(run.run_id, "test", run.dry_run, run.started_at)
+    database.finish_run(run)
+    item_id = database.get_run_items(run.run_id)[0]["id"]
+
+    class FakeMalClient:
+        @staticmethod
+        def get_anime(mal_id):
+            return {"id": mal_id, "title": "Chosen MAL title"}
+
+    started = []
+
+    class UnexpectedThread:
+        def __init__(self, *args, **kwargs):
+            started.append("created")
+
+        def start(self):
+            started.append("started")
+
+    monkeypatch.setattr("bangumi2mal.web.build_mal_client", lambda *_: FakeMalClient())
+    monkeypatch.setattr("bangumi2mal.web.threading.Thread", UnexpectedThread)
+
+    app = create_app(app_settings)
+    app.config["TESTING"] = True
+    client = app.test_client()
+    client.get("/login")
+    with client.session_transaction() as state:
+        csrf = state["csrf_token"]
+    client.post("/login", data={"password": "secret", "csrf_token": csrf})
+    with client.session_transaction() as state:
+        csrf = state["csrf_token"]
+
+    response = client.post(
+        f"/items/{item_id}/map",
+        data={"mal_id": "84", "retry": "yes", "csrf_token": csrf},
+    )
+
+    assert response.status_code == 302
+    mapping = database.get_mapping(42)
+    assert mapping is not None
+    assert mapping["mal_id"] == 84
+    assert mapping["source"] == "manual"
+    assert started == []

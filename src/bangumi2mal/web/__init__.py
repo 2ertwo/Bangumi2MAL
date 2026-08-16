@@ -186,10 +186,7 @@ def create_app(settings: Optional[Settings] = None) -> Flask:
         except Exception as exc:
             flash(f"Could not validate that MAL ID: {exc}", "danger")
             return redirect(url_for("run_detail", run_id=item["run_id"]))
-        flash("Mapping saved. It will be used by future syncs.", "success")
-        if request.form.get("retry") == "yes":
-            start_sync(True, "mapping-retry")
-            flash("A new dry run was started.", "info")
+        flash("Mapping saved. Confirm the remaining items, then retry the dry run.", "success")
         return redirect(url_for("run_detail", run_id=item["run_id"]))
 
     @app.get("/mappings")

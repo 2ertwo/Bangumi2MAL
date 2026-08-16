@@ -3,7 +3,15 @@
 <h1 class="h3">Run {{ run.id }}</h1>
 <p class="text-secondary">{{ run.status }} · {{ run.started_at }} · {{ 'dry run' if run.dry_run else 'live' }}</p>
 {% if run.message %}<div class="alert alert-danger">{{ run.message }}</div>{% endif %}
-<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Bangumi</th><th>MAL</th><th>Match</th><th>Result</th><th>Changes / action</th></tr></thead><tbody>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <p class="text-secondary small mb-0">Save all manual mappings first, then run one new dry run.</p>
+  <form method="post" action="{{ url_for('start_manual_sync') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="mode" value="dry-run">
+    <button class="btn btn-primary btn-sm">Retry dry run</button>
+  </form>
+</div>
+<div class="table-responsive"><table class="table table-sm align-middle run-items-table"><thead><tr><th>Bangumi</th><th>MAL</th><th>Match</th><th>Result</th><th>Changes / action</th></tr></thead><tbody>
 {% for item in items %}<tr>
   <td>
     <div class="d-flex align-items-start gap-2">
@@ -19,21 +27,20 @@
   </td>
   <td>{{ item.match_method }}{% if item.match_confidence %}<br><small>{{ '%.3f'|format(item.match_confidence) }}</small>{% endif %}</td>
   <td><span class="badge text-bg-{{ 'success' if item.result in ['synced','skipped'] else 'primary' if item.result == 'planned' else 'warning' if item.result == 'unresolved' else 'danger' }}">{{ item.result }}</span>{% if item.error %}<div class="small text-danger mt-1">{{ item.error }}</div>{% endif %}</td>
-  <td>
+  <td class="candidate-cell">
     {% if item.changes %}<code>{{ item.changes }}</code>{% endif %}
     {% if item.result == 'unresolved' %}
       {% if item.candidates %}
       <div class="small fw-semibold mt-2 mb-1">Candidates</div>
-      <div class="candidate-strip d-flex flex-nowrap gap-2 overflow-x-auto pb-2 mb-3">
+      <div class="candidate-strip d-flex flex-nowrap gap-2 pb-2 mb-3" data-bangumi-id="{{ item.bangumi_id }}">
         {% for candidate in item.candidates %}
         <form method="post" action="{{ url_for('map_item', item_id=item.id) }}" class="candidate-card card">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <input type="hidden" name="retry" value="yes">
           {% if candidate.cover_url %}<a href="https://myanimelist.net/anime/{{ candidate.anime_id }}" target="_blank" rel="noopener"><img src="{{ candidate.cover_url }}" alt="{{ candidate.title }} cover" class="candidate-cover card-img-top" loading="lazy" referrerpolicy="no-referrer"></a>{% endif %}
           <div class="card-body p-2 d-flex flex-column">
             <a class="small mb-1" href="https://myanimelist.net/anime/{{ candidate.anime_id }}" target="_blank" rel="noopener">{{ candidate.title }}</a>
             <div class="small text-secondary mb-2">{{ candidate.start_date or 'Unknown date' }} · Score {{ '%.2f'|format(candidate.score) }} · #{{ candidate.anime_id }}</div>
-            <button class="btn btn-sm btn-outline-primary mt-auto" name="mal_id" value="{{ candidate.anime_id }}">Use &amp; retry</button>
+            <button class="btn btn-sm btn-outline-primary mt-auto" name="mal_id" value="{{ candidate.anime_id }}">Use</button>
           </div>
         </form>
         {% endfor %}
@@ -41,7 +48,7 @@
       {% endif %}
       <form method="post" action="{{ url_for('map_item', item_id=item.id) }}" class="d-flex gap-2">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input class="form-control form-control-sm" name="mal_id" type="number" min="1" placeholder="Other MAL ID" required>
-        <button class="btn btn-sm btn-outline-primary" name="retry" value="yes">Save &amp; retry dry run</button>
+        <button class="btn btn-sm btn-outline-primary">Save mapping</button>
       </form>
     {% endif %}
   </td>

@@ -1,6 +1,32 @@
+.run-items-table {
+  table-layout: fixed;
+  min-width: 64rem;
+}
+
+.run-items-table th:nth-child(1),
+.run-items-table th:nth-child(2) {
+  width: 18%;
+}
+
+.run-items-table th:nth-child(3),
+.run-items-table th:nth-child(4) {
+  width: 10%;
+}
+
+.run-items-table th:nth-child(5) {
+  width: 44%;
+}
+
+.candidate-cell {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .candidate-strip {
-  width: 65vw;
-  max-width: 48rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
   scrollbar-width: thin;
 }
@@ -17,7 +43,7 @@
 }
 
 @media (max-width: 767.98px) {
-  .candidate-strip {
-    width: 80vw;
+  .run-items-table {
+    min-width: 56rem;
   }
 }
