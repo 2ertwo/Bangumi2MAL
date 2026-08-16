@@ -51,7 +51,33 @@ pip install -e '.[dev,deploy]'
 cp .env.example .env
 ```
 
-## 配置
+## 推荐：一条命令完成配置
+
+首次安装后直接运行：
+
+`ash
+bangumi2mal setup
+`
+
+部署到已有域名的 Ubuntu 服务器时：
+
+`ash
+bangumi2mal setup --base-url https://sync.example.com --no-browser
+`
+
+向导会自动打开凭据页面、从 Bangumi token 识别用户名、计算 MAL Redirect URL、哈希 Web 密码、生成 Flask secret、写入并保护 .env、初始化 SQLite，然后继续完成 MAL OAuth。
+
+由于 Bangumi 和 MAL 的安全限制，个人 access token 与 MAL API Client 仍必须由账号本人在官网创建；向导会打开准确页面，两个凭据都只需粘贴一次，不再需要手工复制配置项、密码哈希或 callback URL。
+
+如果暂时不想完成 MAL OAuth，可使用：
+
+`ash
+bangumi2mal setup --skip-mal-auth
+`
+
+以后再运行 angumi2mal auth-mal 即可。重复运行 setup 会复用已有设置，不会再次询问已经配置的值。
+
+## 手工配置（可选）
 
 编辑 `.env`：
 

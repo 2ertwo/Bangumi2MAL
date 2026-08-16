@@ -16,6 +16,9 @@ class BangumiClient(BaseApiClient):
             headers["Authorization"] = f"Bearer {access_token}"
         super().__init__("https://api.bgm.tv", headers)
 
+    def get_me(self) -> dict[str, Any]:
+        return self.request("GET", "/v0/me").json()
+
     def get_user(self, username: str) -> dict[str, Any]:
         return self.request("GET", f"/v0/users/{username}").json()
 
