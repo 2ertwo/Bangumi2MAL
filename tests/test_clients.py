@@ -54,6 +54,26 @@ def test_oauth_url_contains_pkce_and_state():
     assert "state=state-value" in url
 
 
+def test_mal_search_includes_filtered_titles():
+    calls = []
+
+    class Response:
+        @staticmethod
+        def json():
+            return {"data": []}
+
+    client = object.__new__(MalClient)
+
+    def request(method, url, params):
+        calls.append((method, url, params))
+        return Response()
+
+    client.request = request
+    client.search_anime("Shokei Shoujo no Virgin Road")
+
+    assert calls[0][2]["nsfw"] is True
+
+
 def test_mal_season_catalog_pages_deduplicates_and_filters_quarter():
     calls = []
 
@@ -67,7 +87,7 @@ def test_mal_season_catalog_pages_deduplicates_and_filters_quarter():
     client = object.__new__(MalClient)
 
     def request(method, url, params):
-        calls.append((method, url, params["offset"]))
+        calls.append((method, url, dict(params)))
         season = url.rsplit("/", 1)[-1]
         offset = params["offset"]
         if season == "winter" and offset == 0:
@@ -98,7 +118,8 @@ def test_mal_season_catalog_pages_deduplicates_and_filters_quarter():
     candidates = client.list_anime_by_season(2023, "winter")
 
     assert {candidate.anime_id for candidate in candidates} == {1, 3}
-    assert [offset for _, url, offset in calls if url.endswith("/winter")] == [0, 2]
+    assert [params["offset"] for _, url, params in calls if url.endswith("/winter")] == [0, 2]
+    assert all(params["nsfw"] is True for _, _, params in calls)
 
 
 def test_mal_season_catalog_rejects_unknown_season():

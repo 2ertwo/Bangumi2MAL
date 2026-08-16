@@ -114,7 +114,12 @@ class MalClient(BaseApiClient):
         payload = self.request(
             "GET",
             "/anime",
-            params={"q": query, "limit": min(limit, 20), "fields": self.SEARCH_FIELDS},
+            params={
+                "q": query,
+                "limit": min(limit, 20),
+                "nsfw": True,
+                "fields": self.SEARCH_FIELDS,
+            },
         ).json()
         return [self._candidate_from_node(row.get("node") or {}) for row in payload.get("data", [])]
 
@@ -132,6 +137,7 @@ class MalClient(BaseApiClient):
                 params={
                     "limit": self.SEASON_PAGE_LIMIT,
                     "offset": offset,
+                    "nsfw": True,
                     "fields": self.SEARCH_FIELDS,
                 },
             ).json()
