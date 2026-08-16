@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 User=bangumi2mal
 Group=bangumi2mal
+UMask=0077
 WorkingDirectory=/opt/bangumi2mal
 EnvironmentFile=/opt/bangumi2mal/.env
 ExecStart=/opt/bangumi2mal/.venv/bin/gunicorn --workers 1 --bind 127.0.0.1:8000 "bangumi2mal.web:create_app()"

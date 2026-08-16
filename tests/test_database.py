@@ -1,3 +1,6 @@
+import os
+import stat
+
 from bangumi2mal.database import Database
 from bangumi2mal.models import SyncItemResult, SyncRunResult
 
@@ -18,3 +21,12 @@ def test_database_round_trip(tmp_path):
     database.finish_run(run)
     assert database.get_run("run-1")["planned"] == 1
     assert database.get_run_items("run-1")[0]["changes"] == {"score": 8}
+
+
+def test_database_is_private_on_posix(tmp_path):
+    database_path = tmp_path / "app.db"
+    database = Database(database_path)
+    database.initialize()
+
+    if os.name != "nt":
+        assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
