@@ -93,3 +93,4 @@ def test_run_detail_renders_entry_and_candidate_covers(tmp_path):
     assert b"https://example.com/bangumi.jpg" in response.data
     assert b"https://example.com/candidate.jpg" in response.data
     assert b'name="mal_id" value="84"' in response.data
+    assert b"candidate-strip" in response.data

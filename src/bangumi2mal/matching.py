@@ -33,24 +33,33 @@ def _title_similarity(entry: BangumiEntry, candidate: MalCandidate) -> float:
     return max(scores, default=0.0)
 
 
+def _date_similarity(entry_date: str, candidate_date: str) -> float:
+    if not entry_date or not candidate_date:
+        return 0.5
+    if entry_date == candidate_date:
+        return 1.0
+    if len(entry_date) >= 7 and len(candidate_date) >= 7 and entry_date[:7] == candidate_date[:7]:
+        return 0.9
+    if entry_date[:4] == candidate_date[:4]:
+        return 0.75
+    return 0.0
+
+
+def _episode_similarity(entry_episodes: int, candidate_episodes: int) -> float:
+    if not entry_episodes or not candidate_episodes:
+        return 0.5
+    if entry_episodes == candidate_episodes:
+        return 1.0
+    if abs(entry_episodes - candidate_episodes) <= 1:
+        return 0.6
+    return 0.0
+
+
 def candidate_score(entry: BangumiEntry, candidate: MalCandidate) -> float:
     title_score = _title_similarity(entry, candidate)
-    score = title_score * 0.82
-
-    entry_year = entry.air_date[:4]
-    candidate_year = candidate.start_date[:4]
-    if entry_year and candidate_year:
-        score += 0.10 if entry_year == candidate_year else -0.08
-
-    if entry.total_episodes and candidate.num_episodes:
-        if entry.total_episodes == candidate.num_episodes:
-            score += 0.08
-        elif abs(entry.total_episodes - candidate.num_episodes) <= 1:
-            score += 0.03
-        else:
-            score -= 0.05
-    elif title_score >= 0.99:
-        score += 0.08
+    date_score = _date_similarity(entry.air_date, candidate.start_date)
+    episode_score = _episode_similarity(entry.total_episodes, candidate.num_episodes)
+    score = date_score * 0.55 + title_score * 0.40 + episode_score * 0.05
 
     return max(0.0, min(1.0, score))
 
@@ -63,7 +72,7 @@ class AnimeMatcher:
 
     def match(self, entry: BangumiEntry) -> MatchResult:
         by_id: dict[int, MalCandidate] = {}
-        for title in entry.search_titles[:2]:
+        for title in entry.search_titles[:6]:
             for candidate in self.client.search_anime(title, limit=10):
                 by_id[candidate.anime_id] = candidate
 

@@ -1,0 +1,23 @@
+.candidate-strip {
+  width: 65vw;
+  max-width: 48rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
+.candidate-card {
+  flex: 0 0 9rem;
+  scroll-snap-align: start;
+}
+
+.candidate-cover {
+  width: 100%;
+  height: 12.5rem;
+  object-fit: cover;
+}
+
+@media (max-width: 767.98px) {
+  .candidate-strip {
+    width: 80vw;
+  }
+}

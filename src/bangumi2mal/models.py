@@ -21,10 +21,15 @@ class BangumiEntry:
     air_date: str = ""
     updated_at: str = ""
     cover_url: str = ""
+    aliases: tuple[str, ...] = ()
 
     @property
     def search_titles(self) -> list[str]:
-        values = [self.title, self.title_cn]
+        latin_aliases = [
+            alias for alias in self.aliases if any("a" <= char.casefold() <= "z" for char in alias)
+        ]
+        other_aliases = [alias for alias in self.aliases if alias not in latin_aliases]
+        values = [self.title, self.title_cn, *latin_aliases, *other_aliases]
         return list(dict.fromkeys(value.strip() for value in values if value and value.strip()))
 
 
@@ -69,11 +74,11 @@ class SyncItemResult:
     match_method: str
     match_confidence: float
     result: str
-    bangumi_cover_url: str = ""
-    mal_cover_url: str = ""
     changes: dict[str, Any] = field(default_factory=dict)
     candidates: list[dict[str, Any]] = field(default_factory=list)
     error: str = ""
+    bangumi_cover_url: str = ""
+    mal_cover_url: str = ""
 
 
 @dataclass

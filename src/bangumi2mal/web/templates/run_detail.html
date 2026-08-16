@@ -24,15 +24,15 @@
     {% if item.result == 'unresolved' %}
       {% if item.candidates %}
       <div class="small fw-semibold mt-2 mb-1">Candidates</div>
-      <div class="d-flex flex-wrap gap-2 mb-3">
+      <div class="candidate-strip d-flex flex-nowrap gap-2 overflow-x-auto pb-2 mb-3">
         {% for candidate in item.candidates %}
-        <form method="post" action="{{ url_for('map_item', item_id=item.id) }}" class="card flex-shrink-0">
+        <form method="post" action="{{ url_for('map_item', item_id=item.id) }}" class="candidate-card card">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="retry" value="yes">
-          {% if candidate.cover_url %}<a href="https://myanimelist.net/anime/{{ candidate.anime_id }}" target="_blank" rel="noopener"><img src="{{ candidate.cover_url }}" alt="{{ candidate.title }} cover" width="142" height="200" class="card-img-top object-fit-cover" loading="lazy" referrerpolicy="no-referrer"></a>{% endif %}
+          {% if candidate.cover_url %}<a href="https://myanimelist.net/anime/{{ candidate.anime_id }}" target="_blank" rel="noopener"><img src="{{ candidate.cover_url }}" alt="{{ candidate.title }} cover" class="candidate-cover card-img-top" loading="lazy" referrerpolicy="no-referrer"></a>{% endif %}
           <div class="card-body p-2 d-flex flex-column">
             <a class="small mb-1" href="https://myanimelist.net/anime/{{ candidate.anime_id }}" target="_blank" rel="noopener">{{ candidate.title }}</a>
-            <div class="small text-secondary mb-2">Score {{ '%.2f'|format(candidate.score) }} · #{{ candidate.anime_id }}</div>
+            <div class="small text-secondary mb-2">{{ candidate.start_date or 'Unknown date' }} · Score {{ '%.2f'|format(candidate.score) }} · #{{ candidate.anime_id }}</div>
             <button class="btn btn-sm btn-outline-primary mt-auto" name="mal_id" value="{{ candidate.anime_id }}">Use &amp; retry</button>
           </div>
         </form>

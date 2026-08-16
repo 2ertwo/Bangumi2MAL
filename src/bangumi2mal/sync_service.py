@@ -22,6 +22,9 @@ BANGUMI_TO_MAL_STATUS = {
     5: "dropped",
 }
 
+AUTOMATIC_MAPPING_SOURCE = "automatic_date_v2"
+
+
 
 class SyncAlreadyRunning(RuntimeError):
     pass
@@ -73,6 +76,9 @@ class SyncService:
     def _sync_entry(self, entry: BangumiEntry, dry_run: bool) -> SyncItemResult:
         try:
             mapping = self.database.get_mapping(entry.subject_id)
+            if mapping and str(mapping["source"]) not in {"manual", AUTOMATIC_MAPPING_SOURCE}:
+                self.database.delete_mapping(entry.subject_id)
+                mapping = None
             match_method = "saved_mapping"
             confidence = 1.0
             candidates: list[dict[str, Any]] = []
@@ -80,6 +86,15 @@ class SyncService:
                 mal_id = int(mapping["mal_id"])
                 anime = self.mal_client.get_anime(mal_id)
             else:
+                enrich_entry = getattr(self.bangumi_client, "enrich_entry", None)
+                if callable(enrich_entry):
+                    try:
+                        entry = enrich_entry(entry)
+                    except Exception as exc:
+                        LOGGER.warning(
+                            "Could not load aliases for Bangumi subject %s: %s",
+                            entry.subject_id, exc,
+                        )
                 matched = self.matcher.match(entry)
                 candidates = [candidate.to_dict() for candidate in matched.candidates]
                 if matched.candidate is None:
@@ -105,7 +120,7 @@ class SyncService:
                     mal_id,
                     entry.title_cn or entry.title,
                     str(anime.get("title") or candidate.title),
-                    source="automatic",
+                    source=AUTOMATIC_MAPPING_SOURCE,
                 )
 
             changes = self._calculate_changes(entry, anime)

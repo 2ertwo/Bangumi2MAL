@@ -16,13 +16,15 @@ def test_bangumi_collection_parser():
                 "eps": 12,
                 "date": "2025-10-01",
                 "images": {"large": "https://lain.bgm.tv/pic/cover/l/example.jpg"},
+                "infobox": [{"key": "别名", "value": [{"v": "English Alias"}, {"v": "日本別名"}]}],
             },
         }
     )
     assert entry.subject_id == 123
-    assert entry.search_titles == ["Original", "中文"]
     assert entry.watched_episodes == 6
     assert entry.cover_url == "https://lain.bgm.tv/pic/cover/l/example.jpg"
+    assert entry.aliases == ("English Alias", "日本別名")
+    assert entry.search_titles == ["Original", "中文", "English Alias", "日本別名"]
 
 
 def test_mal_candidate_parser_collects_alternative_titles():
