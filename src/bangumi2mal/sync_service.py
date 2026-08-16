@@ -22,7 +22,7 @@ BANGUMI_TO_MAL_STATUS = {
     5: "dropped",
 }
 
-AUTOMATIC_MAPPING_SOURCE = "automatic_date_v2"
+AUTOMATIC_MAPPING_SOURCE = "automatic_year_v3"
 
 
 
@@ -56,6 +56,9 @@ class SyncService:
         run = SyncRunResult(run_id=run_id, dry_run=dry_run, started_at=utc_now_iso())
         self.database.create_run(run_id, source, dry_run, run.started_at)
         try:
+            clear_match_cache = getattr(self.matcher, "clear_cache", None)
+            if callable(clear_match_cache):
+                clear_match_cache()
             entries = self.bangumi_client.get_anime_collections(self.username)
             for entry in entries:
                 run.items.append(self._sync_entry(entry, dry_run))

@@ -142,4 +142,4 @@ def test_old_automatic_mapping_is_rematched(tmp_path):
     assert matcher.called is True
     mapping = database.get_mapping(10)
     assert mapping["mal_id"] == 30
-    assert mapping["source"] == "automatic_date_v2"
+    assert mapping["source"] == "automatic_year_v3"

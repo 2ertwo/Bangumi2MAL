@@ -67,6 +67,8 @@ class MalOAuth:
 
 class MalClient(BaseApiClient):
     SEARCH_FIELDS = "id,title,alternative_titles,main_picture,media_type,start_date,num_episodes,my_list_status"
+    SEASONS = ("winter", "spring", "summer", "fall")
+    YEAR_PAGE_LIMIT = 100
 
     def __init__(
         self,
@@ -115,6 +117,33 @@ class MalClient(BaseApiClient):
             params={"q": query, "limit": min(limit, 20), "fields": self.SEARCH_FIELDS},
         ).json()
         return [self._candidate_from_node(row.get("node") or {}) for row in payload.get("data", [])]
+
+    def list_anime_by_year(self, year: int) -> list[MalCandidate]:
+        by_id: dict[int, MalCandidate] = {}
+        for season in self.SEASONS:
+            offset = 0
+            while True:
+                payload = self.request(
+                    "GET",
+                    f"/anime/season/{year}/{season}",
+                    params={
+                        "limit": self.YEAR_PAGE_LIMIT,
+                        "offset": offset,
+                        "fields": self.SEARCH_FIELDS,
+                    },
+                ).json()
+                rows = payload.get("data", [])
+                for row in rows:
+                    candidate = self._candidate_from_node(row.get("node") or {})
+                    if candidate.anime_id and candidate.start_date[:4] == str(year):
+                        by_id[candidate.anime_id] = candidate
+
+                paging = payload.get("paging") or {}
+                if not paging.get("next") or not rows:
+                    break
+                offset += len(rows)
+
+        return list(by_id.values())
 
     def get_anime(self, anime_id: int) -> dict[str, Any]:
         return self.request(

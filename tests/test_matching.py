@@ -33,28 +33,29 @@ def test_candidate_score_rewards_title_date_and_episode_match():
     assert candidate_score(entry(), candidate) == pytest.approx(1.0)
 
 
-def test_candidate_score_prioritizes_air_date_over_exact_title():
-    same_date = MalCandidate(
+def test_candidate_score_prioritizes_title_within_air_year():
+    same_date_weaker_title = MalCandidate(
         anime_id=1,
         title="Frieren Beyond Journey",
         start_date="2023-09-29",
         num_episodes=28,
     )
-    exact_title_wrong_date = MalCandidate(
+    exact_title_same_year = MalCandidate(
         anime_id=2,
         title="Sousou no Frieren",
-        start_date="2020-01-01",
+        start_date="2023-01-01",
         num_episodes=28,
     )
-    assert candidate_score(entry(), same_date) > candidate_score(entry(), exact_title_wrong_date)
+    assert candidate_score(entry(), exact_title_same_year) > candidate_score(entry(), same_date_weaker_title)
 
 
 def test_matcher_accepts_clear_winner():
     class Client:
-        def search_anime(self, query, limit=10):
+        def list_anime_by_year(self, year):
+            assert year == 2023
             return [
                 MalCandidate(52991, "Sousou no Frieren", start_date="2023-09-29", num_episodes=28),
-                MalCandidate(60000, "Frieren Shorts", start_date="2024-01-01", num_episodes=6),
+                MalCandidate(60000, "Frieren Shorts", start_date="2023-01-01", num_episodes=6),
             ]
 
     result = AnimeMatcher(Client(), threshold=0.94, margin=0.08).match(entry())
@@ -63,21 +64,19 @@ def test_matcher_accepts_clear_winner():
 
 
 def test_matcher_searches_bangumi_aliases():
-    queries = []
+    years = []
 
     class Client:
-        def search_anime(self, query, limit=10):
-            queries.append(query)
-            if query == "Frieren: Beyond Journey's End":
-                return [
-                    MalCandidate(
-                        52991,
-                        "Frieren: Beyond Journey's End",
-                        start_date="2023-09-29",
-                        num_episodes=28,
-                    )
-                ]
-            return []
+        def list_anime_by_year(self, year):
+            years.append(year)
+            return [
+                MalCandidate(
+                    52991,
+                    "Frieren: Beyond Journey's End",
+                    start_date="2023-09-29",
+                    num_episodes=28,
+                )
+            ]
 
     result = AnimeMatcher(Client()).match(
         entry(
@@ -87,12 +86,13 @@ def test_matcher_searches_bangumi_aliases():
         )
     )
     assert result.candidate is not None
-    assert "Frieren: Beyond Journey's End" in queries
+    assert years == [2023]
 
 
 def test_matcher_rejects_ambiguous_candidates():
     class Client:
-        def search_anime(self, query, limit=10):
+        def list_anime_by_year(self, year):
+            assert year == 2020
             return [
                 MalCandidate(1, "Same Title", start_date="2020-01-01", num_episodes=12),
                 MalCandidate(2, "Same Title", start_date="2020-01-01", num_episodes=12),
@@ -124,7 +124,30 @@ def test_matcher_skips_failed_alias_search_and_uses_other_titles():
             return []
 
     result = AnimeMatcher(Client()).match(
-        entry(title="invalid alias", title_cn="", aliases=("Frieren: Beyond Journey's End",))
+        entry(
+            title="invalid alias",
+            title_cn="",
+            aliases=("Frieren: Beyond Journey's End",),
+            air_date="",
+        )
     )
     assert result.candidate is not None
     assert result.candidate.anime_id == 52991
+
+
+def test_matcher_caches_each_year_until_cleared():
+    years = []
+
+    class Client:
+        def list_anime_by_year(self, year):
+            years.append(year)
+            return [MalCandidate(52991, "Sousou no Frieren", start_date="2023-09-29")]
+
+    matcher = AnimeMatcher(Client())
+    matcher.match(entry())
+    matcher.match(entry(subject_id=2))
+    assert years == [2023]
+
+    matcher.clear_cache()
+    matcher.match(entry(subject_id=3))
+    assert years == [2023, 2023]

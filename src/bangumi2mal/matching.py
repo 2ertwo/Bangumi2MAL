@@ -5,7 +5,7 @@ import re
 import unicodedata
 from dataclasses import replace
 from difflib import SequenceMatcher
-from typing import Protocol
+from typing import Optional, Protocol
 
 from .models import BangumiEntry, MalCandidate, MatchResult
 
@@ -14,6 +14,8 @@ LOGGER = logging.getLogger(__name__)
 
 
 class SearchClient(Protocol):
+    def list_anime_by_year(self, year: int) -> list[MalCandidate]: ...
+
     def search_anime(self, query: str, limit: int = 10) -> list[MalCandidate]: ...
 
 
@@ -63,7 +65,7 @@ def candidate_score(entry: BangumiEntry, candidate: MalCandidate) -> float:
     title_score = _title_similarity(entry, candidate)
     date_score = _date_similarity(entry.air_date, candidate.start_date)
     episode_score = _episode_similarity(entry.total_episodes, candidate.num_episodes)
-    score = date_score * 0.55 + title_score * 0.40 + episode_score * 0.05
+    score = title_score * 0.90 + date_score * 0.05 + episode_score * 0.05
 
     return max(0.0, min(1.0, score))
 
@@ -73,20 +75,16 @@ class AnimeMatcher:
         self.client = client
         self.threshold = threshold
         self.margin = margin
+        self._year_cache: dict[int, tuple[MalCandidate, ...]] = {}
+
+    def clear_cache(self) -> None:
+        self._year_cache.clear()
 
     def match(self, entry: BangumiEntry) -> MatchResult:
-        by_id: dict[int, MalCandidate] = {}
-        for title in entry.search_titles[:6]:
-            try:
-                candidates = self.client.search_anime(title, limit=10)
-            except Exception as exc:
-                LOGGER.warning("Skipping failed MAL search title %r: %s", title, exc)
-                continue
-            for candidate in candidates:
-                by_id[candidate.anime_id] = candidate
+        candidates = self._candidates_for_entry(entry)
 
         ranked = sorted(
-            (replace(candidate, score=candidate_score(entry, candidate)) for candidate in by_id.values()),
+            (replace(candidate, score=candidate_score(entry, candidate)) for candidate in candidates),
             key=lambda candidate: candidate.score,
             reverse=True,
         )
@@ -98,3 +96,26 @@ class AnimeMatcher:
         if best.score >= self.threshold and best.score - runner_up >= self.margin:
             return MatchResult(best, "automatic", best.score, tuple(ranked[:5]))
         return MatchResult(None, "ambiguous", best.score, tuple(ranked[:5]))
+
+    def _candidates_for_entry(self, entry: BangumiEntry) -> tuple[MalCandidate, ...]:
+        year = self._air_year(entry.air_date)
+        if year is not None:
+            if year not in self._year_cache:
+                self._year_cache[year] = tuple(self.client.list_anime_by_year(year))
+            return self._year_cache[year]
+
+        by_id: dict[int, MalCandidate] = {}
+        for title in entry.search_titles[:6]:
+            try:
+                candidates = self.client.search_anime(title, limit=10)
+            except Exception as exc:
+                LOGGER.warning("Skipping failed MAL search title %r: %s", title, exc)
+                continue
+            for candidate in candidates:
+                by_id[candidate.anime_id] = candidate
+        return tuple(by_id.values())
+
+    @staticmethod
+    def _air_year(air_date: str) -> Optional[int]:
+        match = re.match(r"^(\d{4})(?:-|$)", air_date)
+        return int(match.group(1)) if match else None

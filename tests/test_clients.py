@@ -50,3 +50,49 @@ def test_oauth_url_contains_pkce_and_state():
     assert "code_challenge=verifier" in url
     assert "code_challenge_method=plain" in url
     assert "state=state-value" in url
+
+
+def test_mal_year_catalog_pages_seasons_deduplicates_and_filters_year():
+    calls = []
+
+    class Response:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    client = object.__new__(MalClient)
+
+    def request(method, url, params):
+        calls.append((method, url, params["offset"]))
+        season = url.rsplit("/", 1)[-1]
+        offset = params["offset"]
+        if season == "winter" and offset == 0:
+            return Response(
+                {
+                    "data": [
+                        {"node": {"id": 1, "title": "In year", "start_date": "2023-01-01"}},
+                        {"node": {"id": 2, "title": "Old", "start_date": "2022-10-01"}},
+                    ],
+                    "paging": {"next": "next-page"},
+                }
+            )
+        if season == "winter" and offset == 2:
+            return Response(
+                {
+                    "data": [
+                        {"node": {"id": 1, "title": "Duplicate", "start_date": "2023-01-01"}},
+                        {"node": {"id": 3, "title": "Also in year", "start_date": "2023-02-01"}},
+                        {"node": {"id": 4, "title": "Year only", "start_date": "2023"}},
+                    ],
+                    "paging": {},
+                }
+            )
+        return Response({"data": [], "paging": {}})
+
+    client.request = request
+    candidates = client.list_anime_by_year(2023)
+
+    assert {candidate.anime_id for candidate in candidates} == {1, 3, 4}
+    assert [offset for _, url, offset in calls if url.endswith("/winter")] == [0, 2]
