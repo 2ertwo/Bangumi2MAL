@@ -50,6 +50,36 @@ class SyncService:
         self.allow_decrease_watched = allow_decrease_watched
 
     def run(self, dry_run: bool = False, source: str = "cli") -> SyncRunResult:
+        return self._run(
+            dry_run=dry_run,
+            source=source,
+            incremental=False,
+        )
+
+    def run_incremental(
+        self, dry_run: bool = False, source: str = "cli-incremental"
+    ) -> SyncRunResult:
+        return self._run(
+            dry_run=dry_run,
+            source=source,
+            incremental=True,
+        )
+
+    @staticmethod
+    def _collection_state(entry: BangumiEntry) -> tuple[int, int, int]:
+        return (
+            entry.collection_type,
+            entry.score,
+            entry.watched_episodes,
+        )
+
+    def _run(
+        self,
+        *,
+        dry_run: bool,
+        source: str,
+        incremental: bool,
+    ) -> SyncRunResult:
         if not SYNC_LOCK.acquire(blocking=False):
             raise SyncAlreadyRunning("another sync is already running")
         run_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
@@ -60,8 +90,29 @@ class SyncService:
             if callable(clear_match_cache):
                 clear_match_cache()
             entries = self.bangumi_client.get_anime_collections(self.username)
-            for entry in entries:
-                run.items.append(self._sync_entry(entry, dry_run))
+            entries_to_sync = entries
+            if incremental:
+                state = self.database.get_collection_sync_state()
+                entries_to_sync = [
+                    entry
+                    for entry in entries
+                    if state.get(entry.subject_id) != self._collection_state(entry)
+                ]
+
+            processed_entries: list[BangumiEntry] = []
+            for entry in entries_to_sync:
+                item = self._sync_entry(entry, dry_run)
+                run.items.append(item)
+                if not dry_run and item.result in {"synced", "skipped"}:
+                    processed_entries.append(entry)
+
+            if not dry_run:
+                self.database.save_collection_sync_states(processed_entries)
+                self.database.delete_collection_sync_states_not_in(
+                    {entry.subject_id for entry in entries}
+                )
+            if incremental and not run.items:
+                run.message = "No Bangumi collection changes detected."
             run.status = "partial" if any(item.result == "failed" for item in run.items) else "completed"
             run.finished_at = utc_now_iso()
             self.database.finish_run(run)

@@ -19,7 +19,12 @@
   </div></div></div>
   <div class="col-md-6"><div class="card h-100"><div class="card-body">
     <h2 class="h5">Automatic sync</h2>
-    {% if settings.auto_sync_enabled %}<p class="mb-1">Enabled every {{ settings.auto_sync_hours }} hours.</p><small class="text-secondary">Next run: {{ job.next_run_time if job else 'pending' }}</small>
+    {% if settings.auto_sync_enabled %}<p class="mb-1">RSS change check every {{ settings.rss_poll_minutes }} minutes.</p>
+    <small class="text-secondary">Next RSS check: {{ rss_job.next_run_time if rss_job else 'pending' }}</small>
+    <p class="mb-1 mt-3">Incremental API scan every {{ settings.incremental_sync_minutes }} minutes.</p>
+    <small class="text-secondary">Next incremental run: {{ incremental_job.next_run_time if incremental_job else 'pending' }}</small>
+    <p class="mb-1 mt-3">Full reconciliation every {{ settings.auto_sync_hours }} hours.</p>
+    <small class="text-secondary">Next full run: {{ full_job.next_run_time if full_job else 'pending' }}</small>
     {% else %}<p class="mb-0 text-secondary">Disabled. Set <code>AUTO_SYNC_ENABLED=true</code> after validating a dry run.</p>{% endif %}
   </div></div></div>
 </div>

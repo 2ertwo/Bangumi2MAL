@@ -178,6 +178,15 @@ class SetupWizard:
             "WEB_PASSWORD_HASH": web_password_hash,
             "FLASK_SECRET_KEY": flask_secret,
             "SESSION_COOKIE_SECURE": "true" if selected_base_url.startswith("https://") else "false",
+            "AUTO_SYNC_ENABLED": self._existing(existing, "AUTO_SYNC_ENABLED") or "false",
+            "RSS_POLL_MINUTES": self._existing(existing, "RSS_POLL_MINUTES")
+            or "5",
+            "INCREMENTAL_SYNC_MINUTES": self._existing(
+                existing, "INCREMENTAL_SYNC_MINUTES"
+            ) or "10",
+            "FULL_SYNC_HOURS": self._existing(existing, "FULL_SYNC_HOURS")
+            or self._existing(existing, "AUTO_SYNC_HOURS")
+            or "24",
         }
         write_env_values(self.env_path, values)
         for key, value in values.items():

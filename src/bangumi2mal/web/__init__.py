@@ -12,7 +12,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
-from ..clients import MalOAuth
+from ..clients import BangumiClient, MalOAuth
 from ..config import Settings
 from ..reporting import export_run
 from ..runtime import build_database, build_mal_client, build_sync_service
@@ -122,26 +122,73 @@ def create_app(settings: Optional[Settings] = None) -> Flask:
         token = database.get_token("mal")
         runs = database.list_runs(20)
         scheduler = app.extensions.get("bangumi2mal_scheduler")
-        job = scheduler.get_job("automatic-sync") if scheduler else None
-        return render_template("dashboard.html", runs=runs, token=token, job=job, settings=settings)
+        rss_job = scheduler.get_job("rss-trigger") if scheduler else None
+        incremental_job = scheduler.get_job("incremental-sync") if scheduler else None
+        full_job = scheduler.get_job("full-sync") if scheduler else None
+        return render_template(
+            "dashboard.html",
+            runs=runs,
+            token=token,
+            rss_job=rss_job,
+            incremental_job=incremental_job,
+            full_job=full_job,
+            settings=settings,
+        )
 
-    def run_in_background(dry_run: bool, source: str) -> None:
+    def run_in_background(
+        dry_run: bool, source: str, incremental: bool = False
+    ) -> None:
         with app.app_context():
             try:
                 service = build_sync_service(settings, database)
-                result = service.run(dry_run=dry_run, source=source)
+                if incremental:
+                    result = service.run_incremental(dry_run=dry_run, source=source)
+                else:
+                    result = service.run(dry_run=dry_run, source=source)
                 export_run(result, settings.reports_dir)
             except SyncAlreadyRunning:
                 app.logger.info("Skipped %s sync because another run is active", source)
             except Exception:
                 app.logger.exception("Background sync failed")
 
-    def start_sync(dry_run: bool, source: str) -> bool:
+    def start_sync(dry_run: bool, source: str, incremental: bool = False) -> bool:
         if database.has_running_run():
             return False
-        thread = threading.Thread(target=run_in_background, args=(dry_run, source), daemon=True)
+        thread = threading.Thread(
+            target=run_in_background,
+            args=(dry_run, source, incremental),
+            daemon=True,
+        )
         thread.start()
         return True
+
+    def poll_timeline_feed() -> None:
+        checkpoint_key = f"timeline:{settings.bangumi_username}"
+        client = BangumiClient(
+            settings.bangumi_access_token, settings.bangumi_user_agent
+        )
+        try:
+            guids = client.get_timeline_feed_guids(settings.bangumi_username)
+        except Exception:
+            app.logger.exception("Bangumi timeline RSS poll failed")
+            return
+        finally:
+            client.close()
+
+        if not guids:
+            return
+        latest_guid = guids[0]
+        previous_guid = database.get_feed_checkpoint(checkpoint_key)
+        if not previous_guid:
+            database.save_feed_checkpoint(checkpoint_key, latest_guid)
+            app.logger.info("Initialized Bangumi timeline RSS checkpoint")
+            return
+        if latest_guid == previous_guid:
+            return
+        if start_sync(False, "rss-trigger", incremental=True):
+            database.save_feed_checkpoint(checkpoint_key, latest_guid)
+        else:
+            app.logger.info("RSS change detected; waiting for the active sync to finish")
 
     @app.post("/sync")
     @login_required
@@ -229,7 +276,32 @@ def create_app(settings: Optional[Settings] = None) -> Flask:
 
     if settings.auto_sync_enabled:
         scheduler = BackgroundScheduler(timezone="UTC", daemon=True)
-        scheduler.add_job(lambda: start_sync(False, "scheduler"), "interval", hours=settings.auto_sync_hours, id="automatic-sync", max_instances=1, coalesce=True)
+        scheduler.add_job(
+            poll_timeline_feed,
+            "interval",
+            minutes=settings.rss_poll_minutes,
+            id="rss-trigger",
+            max_instances=1,
+            coalesce=True,
+        )
+        scheduler.add_job(
+            lambda: start_sync(
+                False, "scheduler-incremental", incremental=True
+            ),
+            "interval",
+            minutes=settings.incremental_sync_minutes,
+            id="incremental-sync",
+            max_instances=1,
+            coalesce=True,
+        )
+        scheduler.add_job(
+            lambda: start_sync(False, "scheduler-full"),
+            "interval",
+            hours=settings.auto_sync_hours,
+            id="full-sync",
+            max_instances=1,
+            coalesce=True,
+        )
         scheduler.start()
         app.extensions["bangumi2mal_scheduler"] = scheduler
 

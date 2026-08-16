@@ -22,6 +22,10 @@ CONFIG_KEYS = [
     "WEB_PASSWORD_HASH",
     "FLASK_SECRET_KEY",
     "SESSION_COOKIE_SECURE",
+    "AUTO_SYNC_ENABLED",
+    "RSS_POLL_MINUTES",
+    "INCREMENTAL_SYNC_MINUTES",
+    "FULL_SYNC_HOURS",
 ]
 
 
@@ -79,6 +83,10 @@ def test_setup_writes_complete_configuration_and_detects_username(tmp_path, monk
     assert values["MAL_CLIENT_SECRET"] == "mal-client-secret"
     assert values["MAL_REDIRECT_URI"] == "https://sync.example.com/oauth/mal/callback"
     assert values["SESSION_COOKIE_SECURE"] == "true"
+    assert values["AUTO_SYNC_ENABLED"] == "false"
+    assert values["RSS_POLL_MINUTES"] == "5"
+    assert values["INCREMENTAL_SYNC_MINUTES"] == "10"
+    assert values["FULL_SYNC_HOURS"] == "24"
     assert check_password_hash(values["WEB_PASSWORD_HASH"], "web-password")
     assert values["FLASK_SECRET_KEY"]
     assert result.settings.database_path.exists()

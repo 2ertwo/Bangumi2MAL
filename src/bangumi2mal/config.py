@@ -34,6 +34,8 @@ class Settings:
     auto_match_margin: float
     allow_decrease_watched: bool
     session_cookie_secure: bool
+    incremental_sync_minutes: int = 10
+    rss_poll_minutes: int = 5
 
     @classmethod
     def from_env(cls, env_file: Optional[Path] = None) -> "Settings":
@@ -56,7 +58,14 @@ class Settings:
             reports_dir=Path(os.getenv("REPORTS_DIR", "reports")),
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
             auto_sync_enabled=_as_bool(os.getenv("AUTO_SYNC_ENABLED")),
-            auto_sync_hours=max(1, int(os.getenv("AUTO_SYNC_HOURS", "6"))),
+            auto_sync_hours=max(
+                1,
+                int(os.getenv("FULL_SYNC_HOURS", os.getenv("AUTO_SYNC_HOURS", "24"))),
+            ),
+            incremental_sync_minutes=max(
+                1, int(os.getenv("INCREMENTAL_SYNC_MINUTES", "10"))
+            ),
+            rss_poll_minutes=max(1, int(os.getenv("RSS_POLL_MINUTES", "5"))),
             mal_write_delay_seconds=max(
                 0.0, float(os.getenv("MAL_WRITE_DELAY_SECONDS", "1.0"))
             ),

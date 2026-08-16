@@ -162,8 +162,12 @@ bangumi2mal serve --host 127.0.0.1 --port 5000
 
 ```env
 AUTO_SYNC_ENABLED=true
-AUTO_SYNC_HOURS=6
+RSS_POLL_MINUTES=5
+INCREMENTAL_SYNC_MINUTES=10
+FULL_SYNC_HOURS=24
 ```
+
+时间线 RSS 每 5 分钟检查一次，有新事件时会提前触发增量校验；收藏 API 每 10 分钟比较一次上次成功同步的状态快照，只处理状态、评分或观看进度发生变化的条目；每 24 小时再执行一次完整校验。未匹配或失败的条目不会推进快照，会保留在 Web UI 并在之后自动重试。
 
 调度器随 Web 进程启动，并使用同一个同步锁避免任务重叠。开启内置调度器时必须只启动一个 Web worker，否则每个 worker 都会创建自己的调度器。
 

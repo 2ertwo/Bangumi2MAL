@@ -111,7 +111,10 @@ def command_sync(args: argparse.Namespace) -> int:
     _configure_logging(settings)
     database = build_database(settings)
     service = build_sync_service(settings, database)
-    run = service.run(dry_run=args.dry_run, source="cli")
+    if args.incremental:
+        run = service.run_incremental(dry_run=args.dry_run, source="cli-incremental")
+    else:
+        run = service.run(dry_run=args.dry_run, source="cli")
     report_path = export_run(run, settings.reports_dir)
     counts = run.counts
     print(
@@ -177,6 +180,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sync = subparsers.add_parser("sync", help="run one Bangumi to MAL sync")
     sync.add_argument("--dry-run", action="store_true", help="calculate without writing to MAL")
+    sync.add_argument(
+        "--incremental",
+        action="store_true",
+        help="only process collection states changed since the last successful live sync",
+    )
     sync.set_defaults(func=command_sync)
 
     serve = subparsers.add_parser("serve", help="run the Flask web UI")

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from dataclasses import replace
 from typing import Any
+from urllib.parse import quote
 
 from ..models import BangumiEntry
 from .base import BaseApiClient
@@ -22,6 +24,22 @@ class BangumiClient(BaseApiClient):
 
     def get_user(self, username: str) -> dict[str, Any]:
         return self.request("GET", f"/v0/users/{username}").json()
+
+    def get_timeline_feed_guids(self, username: str) -> tuple[str, ...]:
+        response = self.request(
+            "GET",
+            f"https://bgm.tv/feed/user/{quote(username, safe='')}/timeline",
+            headers={"Accept": "application/rss+xml"},
+        )
+        try:
+            root = ET.fromstring(response.text)
+        except ET.ParseError as exc:
+            raise ValueError("Bangumi timeline RSS returned invalid XML") from exc
+        return tuple(
+            guid.text.strip()
+            for guid in root.findall("./channel/item/guid")
+            if guid.text and guid.text.strip()
+        )
 
     def get_subject(self, subject_id: int) -> dict[str, Any]:
         return self.request("GET", f"/v0/subjects/{subject_id}").json()

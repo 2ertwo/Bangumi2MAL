@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
-from .models import SyncItemResult, SyncRunResult, utc_now_iso
+from .models import BangumiEntry, SyncItemResult, SyncRunResult, utc_now_iso
 
 
 SCHEMA = """
@@ -61,6 +61,18 @@ CREATE TABLE IF NOT EXISTS sync_items (
 );
 CREATE INDEX IF NOT EXISTS idx_sync_items_run_id ON sync_items(run_id);
 CREATE INDEX IF NOT EXISTS idx_sync_items_result ON sync_items(result);
+CREATE TABLE IF NOT EXISTS collection_sync_state (
+    subject_id INTEGER PRIMARY KEY,
+    collection_type INTEGER NOT NULL,
+    score INTEGER NOT NULL,
+    watched_episodes INTEGER NOT NULL,
+    synced_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS feed_checkpoints (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -139,6 +151,84 @@ class Database:
             return connection.execute(
                 "SELECT * FROM mappings ORDER BY updated_at DESC"
             ).fetchall()
+
+    def get_collection_sync_state(self) -> dict[int, tuple[int, int, int]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT subject_id, collection_type, score, watched_episodes
+                FROM collection_sync_state"""
+            ).fetchall()
+        return {
+            int(row["subject_id"]): (
+                int(row["collection_type"]),
+                int(row["score"]),
+                int(row["watched_episodes"]),
+            )
+            for row in rows
+        }
+
+    def save_collection_sync_states(self, entries: list[BangumiEntry]) -> None:
+        if not entries:
+            return
+        synced_at = utc_now_iso()
+        with self.connect() as connection:
+            connection.executemany(
+                """
+                INSERT INTO collection_sync_state
+                    (subject_id, collection_type, score, watched_episodes, synced_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(subject_id) DO UPDATE SET
+                    collection_type = excluded.collection_type,
+                    score = excluded.score,
+                    watched_episodes = excluded.watched_episodes,
+                    synced_at = excluded.synced_at
+                """,
+                [
+                    (
+                        entry.subject_id,
+                        entry.collection_type,
+                        entry.score,
+                        entry.watched_episodes,
+                        synced_at,
+                    )
+                    for entry in entries
+                ],
+            )
+
+    def delete_collection_sync_states_not_in(self, subject_ids: set[int]) -> None:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT subject_id FROM collection_sync_state"
+            ).fetchall()
+            stale = [
+                (int(row["subject_id"]),)
+                for row in rows
+                if int(row["subject_id"]) not in subject_ids
+            ]
+            if stale:
+                connection.executemany(
+                    "DELETE FROM collection_sync_state WHERE subject_id = ?", stale
+                )
+
+    def get_feed_checkpoint(self, key: str) -> str:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM feed_checkpoints WHERE key = ?", (key,)
+            ).fetchone()
+        return str(row["value"]) if row else ""
+
+    def save_feed_checkpoint(self, key: str, value: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO feed_checkpoints (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+                """,
+                (key, value, utc_now_iso()),
+            )
 
     def save_token(
         self, provider: str, access_token: str, refresh_token: str, expires_at: int
