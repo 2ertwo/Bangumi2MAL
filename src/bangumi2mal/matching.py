@@ -14,7 +14,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class SearchClient(Protocol):
-    def list_anime_by_year(self, year: int) -> list[MalCandidate]: ...
+    def list_anime_by_season(self, year: int, season: str) -> list[MalCandidate]: ...
 
     def search_anime(self, query: str, limit: int = 10) -> list[MalCandidate]: ...
 
@@ -65,7 +65,7 @@ def candidate_score(entry: BangumiEntry, candidate: MalCandidate) -> float:
     title_score = _title_similarity(entry, candidate)
     date_score = _date_similarity(entry.air_date, candidate.start_date)
     episode_score = _episode_similarity(entry.total_episodes, candidate.num_episodes)
-    score = title_score * 0.90 + date_score * 0.05 + episode_score * 0.05
+    score = date_score * 0.55 + title_score * 0.40 + episode_score * 0.05
 
     return max(0.0, min(1.0, score))
 
@@ -75,35 +75,26 @@ class AnimeMatcher:
         self.client = client
         self.threshold = threshold
         self.margin = margin
-        self._year_cache: dict[int, tuple[MalCandidate, ...]] = {}
+        self._season_cache: dict[tuple[int, str], tuple[MalCandidate, ...]] = {}
 
     def clear_cache(self) -> None:
-        self._year_cache.clear()
+        self._season_cache.clear()
 
     def match(self, entry: BangumiEntry) -> MatchResult:
-        candidates = self._candidates_for_entry(entry)
+        searched = self._rank(entry, self._search_candidates(entry))
+        primary = self._match_ranked(searched, "automatic_search")
+        if primary.candidate is not None:
+            return primary
 
-        ranked = sorted(
-            (replace(candidate, score=candidate_score(entry, candidate)) for candidate in candidates),
-            key=lambda candidate: candidate.score,
-            reverse=True,
-        )
-        if not ranked:
-            return MatchResult(None, "no_candidates", 0.0, ())
+        period = self._air_season(entry.air_date)
+        if period is None:
+            return primary
 
-        best = ranked[0]
-        runner_up = ranked[1].score if len(ranked) > 1 else 0.0
-        if best.score >= self.threshold and best.score - runner_up >= self.margin:
-            return MatchResult(best, "automatic", best.score, tuple(ranked[:5]))
-        return MatchResult(None, "ambiguous", best.score, tuple(ranked[:5]))
+        seasonal = self._rank(entry, self._season_candidates(period))
+        fallback = self._match_ranked(seasonal, "automatic_season")
+        return fallback if fallback.method != "no_candidates" else primary
 
-    def _candidates_for_entry(self, entry: BangumiEntry) -> tuple[MalCandidate, ...]:
-        year = self._air_year(entry.air_date)
-        if year is not None:
-            if year not in self._year_cache:
-                self._year_cache[year] = tuple(self.client.list_anime_by_year(year))
-            return self._year_cache[year]
-
+    def _search_candidates(self, entry: BangumiEntry) -> tuple[MalCandidate, ...]:
         by_id: dict[int, MalCandidate] = {}
         for title in entry.search_titles[:6]:
             try:
@@ -115,7 +106,42 @@ class AnimeMatcher:
                 by_id[candidate.anime_id] = candidate
         return tuple(by_id.values())
 
+    def _season_candidates(self, period: tuple[int, str]) -> tuple[MalCandidate, ...]:
+        if period not in self._season_cache:
+            year, season = period
+            self._season_cache[period] = tuple(
+                self.client.list_anime_by_season(year, season)
+            )
+        return self._season_cache[period]
+
     @staticmethod
-    def _air_year(air_date: str) -> Optional[int]:
-        match = re.match(r"^(\d{4})(?:-|$)", air_date)
-        return int(match.group(1)) if match else None
+    def _rank(
+        entry: BangumiEntry, candidates: tuple[MalCandidate, ...]
+    ) -> tuple[MalCandidate, ...]:
+        scored = (
+            replace(candidate, score=candidate_score(entry, candidate))
+            for candidate in candidates
+        )
+        return tuple(sorted(scored, key=lambda candidate: candidate.score, reverse=True))
+
+    def _match_ranked(
+        self, ranked: tuple[MalCandidate, ...], automatic_method: str
+    ) -> MatchResult:
+        if not ranked:
+            return MatchResult(None, "no_candidates", 0.0, ())
+        best = ranked[0]
+        runner_up = ranked[1].score if len(ranked) > 1 else 0.0
+        if best.score >= self.threshold and best.score - runner_up >= self.margin:
+            return MatchResult(best, automatic_method, best.score, ranked[:5])
+        return MatchResult(None, "ambiguous", best.score, ranked[:5])
+
+    @staticmethod
+    def _air_season(air_date: str) -> Optional[tuple[int, str]]:
+        match = re.match(r"^(\d{4})-(\d{2})(?:-|$)", air_date)
+        if not match:
+            return None
+        month = int(match.group(2))
+        if not 1 <= month <= 12:
+            return None
+        seasons = ("winter", "spring", "summer", "fall")
+        return int(match.group(1)), seasons[(month - 1) // 3]

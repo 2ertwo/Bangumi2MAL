@@ -68,7 +68,7 @@ class MalOAuth:
 class MalClient(BaseApiClient):
     SEARCH_FIELDS = "id,title,alternative_titles,main_picture,media_type,start_date,num_episodes,my_list_status"
     SEASONS = ("winter", "spring", "summer", "fall")
-    YEAR_PAGE_LIMIT = 100
+    SEASON_PAGE_LIMIT = 100
 
     def __init__(
         self,
@@ -118,30 +118,39 @@ class MalClient(BaseApiClient):
         ).json()
         return [self._candidate_from_node(row.get("node") or {}) for row in payload.get("data", [])]
 
-    def list_anime_by_year(self, year: int) -> list[MalCandidate]:
+    def list_anime_by_season(self, year: int, season: str) -> list[MalCandidate]:
+        if season not in self.SEASONS:
+            raise ValueError(f"Unsupported MAL season: {season}")
+        first_month = self.SEASONS.index(season) * 3 + 1
+        season_months = range(first_month, first_month + 3)
         by_id: dict[int, MalCandidate] = {}
-        for season in self.SEASONS:
-            offset = 0
-            while True:
-                payload = self.request(
-                    "GET",
-                    f"/anime/season/{year}/{season}",
-                    params={
-                        "limit": self.YEAR_PAGE_LIMIT,
-                        "offset": offset,
-                        "fields": self.SEARCH_FIELDS,
-                    },
-                ).json()
-                rows = payload.get("data", [])
-                for row in rows:
-                    candidate = self._candidate_from_node(row.get("node") or {})
-                    if candidate.anime_id and candidate.start_date[:4] == str(year):
-                        by_id[candidate.anime_id] = candidate
+        offset = 0
+        while True:
+            payload = self.request(
+                "GET",
+                f"/anime/season/{year}/{season}",
+                params={
+                    "limit": self.SEASON_PAGE_LIMIT,
+                    "offset": offset,
+                    "fields": self.SEARCH_FIELDS,
+                },
+            ).json()
+            rows = payload.get("data", [])
+            for row in rows:
+                candidate = self._candidate_from_node(row.get("node") or {})
+                month_text = candidate.start_date[5:7]
+                candidate_month = int(month_text) if month_text.isdigit() else 0
+                if (
+                    candidate.anime_id
+                    and candidate.start_date[:4] == str(year)
+                    and candidate_month in season_months
+                ):
+                    by_id[candidate.anime_id] = candidate
 
-                paging = payload.get("paging") or {}
-                if not paging.get("next") or not rows:
-                    break
-                offset += len(rows)
+            paging = payload.get("paging") or {}
+            if not paging.get("next") or not rows:
+                break
+            offset += len(rows)
 
         return list(by_id.values())
 

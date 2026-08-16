@@ -22,7 +22,7 @@ BANGUMI_TO_MAL_STATUS = {
     5: "dropped",
 }
 
-AUTOMATIC_MAPPING_SOURCE = "automatic_year_v3"
+AUTOMATIC_MAPPING_SOURCE = "automatic_search_season_v4"
 
 
 
